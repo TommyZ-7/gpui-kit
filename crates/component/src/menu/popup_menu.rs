@@ -1,14 +1,16 @@
 use crate::ThemeStyled as _;
 use crate::actions::{Cancel, Confirm, SelectDown, SelectUp};
 use crate::actions::{SelectLeft, SelectRight};
+use crate::animation::ease_out_cubic;
 use crate::menu::menu_item::MenuItemElement;
 use crate::scroll::ScrollableElement;
+use crate::styled::{popover_ring, popover_shadow};
 use crate::{ActiveTheme, ElementExt, Icon, IconName, Sizable as _, h_flex, v_flex};
 use crate::{Side, Size, kbd::Kbd};
 use gpui::{
-    Action, Anchor, AnyElement, App, AppContext, Bounds, Context, DismissEvent, Edges, Entity,
-    EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding,
-    ParentElement, Pixels, Rems, Render, Role, ScrollHandle, SharedString,
+    Action, Anchor, Animation, AnimationExt as _, AnyElement, App, AppContext, Bounds, Context,
+    DismissEvent, Edges, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
+    IntoElement, KeyBinding, ParentElement, Pixels, Rems, Render, Role, ScrollHandle, SharedString,
     StatefulInteractiveElement, Styled, WeakEntity, Window, anchored, deferred, div,
     prelude::FluentBuilder, px, rems,
 };
@@ -17,12 +19,25 @@ use gpui_base::TestSupportExt as _;
 
 use std::collections::HashSet;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
+
+static NEXT_ANIMATION_ID: AtomicU64 = AtomicU64::new(1);
 
 const CONTEXT: &str = "PopupMenu";
 
 /// How many frames a newly opened scrollable menu waits for its items to be
 /// measured before it gives up scrolling to the checked item.
 const SCROLL_TO_CHECKED_FRAMES: u8 = 4;
+
+/// Opacity, vertical offset, and shadow strength for the menu's opening frame.
+///
+/// The shadow ramps as `t^3` so a translucent surface does not reveal its own
+/// blurred shadow as a dark slab during the fade.
+pub(crate) fn popup_menu_open_frame(t: f32, offset: Pixels) -> (f32, Pixels, f32) {
+    let t = t.clamp(0.0, 1.0);
+    (t, -offset * (1.0 - t), t * t * t)
+}
 
 pub fn init(cx: &mut App) {
     cx.bind_keys([
@@ -339,6 +354,12 @@ pub struct PopupMenu {
     /// reaches it, while the scroll offset is still baked into its anchor.
     priority: usize,
 
+    /// Optional opt-in open animation: duration and vertical travel.
+    open_animation: Option<(Duration, Pixels)>,
+    /// Unique per menu entity so the animation state of a parent and a
+    /// submenu cannot collide.
+    animation_id: u64,
+
     _subscriptions: Vec<Subscription>,
 }
 
@@ -365,6 +386,8 @@ impl PopupMenu {
             size: Size::default(),
             submenu_anchor: (Anchor::TopLeft, Pixels::ZERO),
             priority: gpui_base::POPUP_PRIORITY,
+            open_animation: None,
+            animation_id: NEXT_ANIMATION_ID.fetch_add(1, Ordering::Relaxed),
             _subscriptions: vec![],
         }
     }
@@ -375,6 +398,15 @@ impl PopupMenu {
         f: impl FnOnce(Self, &mut Window, &mut Context<PopupMenu>) -> Self,
     ) -> Entity<Self> {
         cx.new(|cx| f(Self::new(cx), window, cx))
+    }
+
+    /// Opt into the opening animation for this menu and its submenus.
+    ///
+    /// `offset` is the vertical travel: the surface starts `offset` above its
+    /// final position, fades in, and ramps its shadow in over `duration`.
+    pub fn open_animation(mut self, duration: Duration, offset: Pixels) -> Self {
+        self.open_animation = Some((duration, offset));
+        self
     }
 
     /// Set the focus handle of Entity to handle actions.
@@ -733,9 +765,11 @@ impl PopupMenu {
         let submenu = PopupMenu::build(window, cx, f);
         let parent_menu = cx.entity().downgrade();
         let parent_priority = self.priority;
+        let open_animation = self.open_animation;
         submenu.update(cx, |view, _| {
             view.parent_menu = Some(parent_menu);
             view.priority = parent_priority + 1;
+            view.open_animation = open_animation;
         });
 
         self.menu_items.push(
@@ -1594,7 +1628,7 @@ impl Render for PopupMenu {
             radius: cx.theme().radius.min(px(8.)),
         };
 
-        v_flex()
+        let surface = v_flex()
             .id("popup-menu")
             .test_support()
             .role(Role::Menu)
@@ -1653,7 +1687,26 @@ impl Render for PopupMenu {
             )
             .when(self.scrollable, |this| {
                 this.vertical_scrollbar(&self.scroll_handle)
-            })
+            });
+
+        if let Some((duration, offset)) = self.open_animation {
+            let ring = popover_ring(cx);
+            surface
+                .with_animation(
+                    ("popup-menu-open", self.animation_id),
+                    Animation::new(duration).with_easing(ease_out_cubic),
+                    move |el, t| {
+                        let (opacity, top, shadow) = popup_menu_open_frame(t, offset);
+                        el.opacity(opacity)
+                            .relative()
+                            .top(top)
+                            .shadow(popover_shadow(ring, shadow))
+                    },
+                )
+                .into_any_element()
+        } else {
+            surface.into_any_element()
+        }
     }
 }
 
@@ -1726,5 +1779,53 @@ mod tests {
         );
         assert_eq!(PopupMenuItem::separator().a11y_label(), None);
         assert_eq!(PopupMenuItem::element(|_, _| div()).a11y_label(), None);
+    }
+
+    #[test]
+    fn popup_menu_open_frame_fades_slides_and_ramps_shadow() {
+        let offset = px(4.);
+        assert_eq!(popup_menu_open_frame(0.0, offset), (0.0, -offset, 0.0));
+        assert_eq!(popup_menu_open_frame(1.0, offset), (1.0, px(0.), 1.0));
+
+        let (opacity, top, shadow) = popup_menu_open_frame(0.5, offset);
+        assert!((opacity - 0.5).abs() < f32::EPSILON);
+        assert_eq!(top, -px(2.));
+        assert!((shadow - 0.125).abs() < f32::EPSILON);
+
+        assert_eq!(popup_menu_open_frame(-1.0, offset), (0.0, -offset, 0.0));
+        assert_eq!(popup_menu_open_frame(2.0, offset), (1.0, px(0.), 1.0));
+    }
+
+    #[gpui::test]
+    fn open_animation_is_opt_in(cx: &mut gpui::TestAppContext) {
+        let menu =
+            cx.update(|cx| PopupMenu::new(cx).open_animation(Duration::from_millis(120), px(4.)));
+        assert_eq!(
+            menu.open_animation,
+            Some((Duration::from_millis(120), px(4.)))
+        );
+
+        let plain = cx.update(|cx| PopupMenu::new(cx));
+        assert_eq!(plain.open_animation, None);
+    }
+
+    #[gpui::test]
+    fn submenu_inherits_the_parent_open_animation(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        let (parent, cx) = cx.add_window_view(|window, cx| {
+            PopupMenu::new(cx)
+                .open_animation(Duration::from_millis(120), px(4.))
+                .submenu("More", window, cx, |menu, _, _| menu)
+        });
+        let (parent_animation, submenu_animation) = cx.update(|_, cx| {
+            let parent = parent.read(cx);
+            let Some(PopupMenuItem::Submenu { menu, .. }) = parent.menu_items.first() else {
+                panic!("expected a submenu item");
+            };
+            (parent.open_animation, menu.read(cx).open_animation)
+        });
+        let expected = Some((Duration::from_millis(120), px(4.)));
+        assert_eq!(parent_animation, expected);
+        assert_eq!(submenu_animation, expected);
     }
 }

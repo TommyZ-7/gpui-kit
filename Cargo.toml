@@ -9,7 +9,6 @@ members = [
     "crates/story",
     "crates/story-web",
     "crates/component",
-    "crates/assets",
     "crates/fps",
     "crates/webview",
     "examples/app_assets",

@@ -3832,11 +3832,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-base"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3e9ae5237737cfd110d0ff513fcd9c20f97d98ebabd0a73164068177f0aca4f"
+dependencies = [
+ "aho-corasick",
+ "anyhow",
+ "ashpd",
+ "async-channel",
+ "chrono",
+ "data-url",
+ "futures",
+ "gpui-fast",
+ "gpui-pre",
+ "gpui-pre-macros",
+ "gpui-pre-sum-tree",
+ "html5ever 0.27.0",
+ "instant",
+ "itertools 0.13.0",
+ "lsp-types 0.97.0",
+ "markdown",
+ "markup5ever_rcdom",
+ "num-traits",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "raw-window-handle",
+ "regex",
+ "ropey",
+ "rust_decimal",
+ "schemars",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "smol",
+ "tracing",
+ "unicode-linebreak",
+ "unicode-segmentation",
+ "web-time",
+ "windows 0.58.0",
+]
+
+[[package]]
 name = "gpui-base-examples"
 version = "0.9.1"
 dependencies = [
  "chrono",
- "gpui-base",
+ "gpui-base 0.9.1",
  "gpui-fast",
  "gpui-fast-platform",
  "gpui-pre",
@@ -3852,7 +3895,7 @@ dependencies = [
  "chrono",
  "console_error_panic_hook",
  "console_log",
- "gpui-base",
+ "gpui-base 0.9.1",
  "gpui-fast",
  "gpui-fast-platform",
  "gpui-pre",
@@ -3874,8 +3917,8 @@ dependencies = [
  "core-text",
  "cpal",
  "enum-iterator",
- "gpui-base",
- "gpui-component-macros",
+ "gpui-base 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gpui-component-macros 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gpui-fast",
  "gpui-kit-assets",
  "gpui-pre",
@@ -3956,6 +3999,18 @@ dependencies = [
 [[package]]
 name = "gpui-component-macros"
 version = "0.9.1"
+dependencies = [
+ "proc-macro-crate 3.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "gpui-component-macros"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9676a5d12c59ce295b5c82cc18365ad8b96cb683682e2e74668a56fb92544300"
 dependencies = [
  "proc-macro-crate 3.5.0",
  "proc-macro2",
@@ -4346,7 +4401,7 @@ name = "gpui-kit"
 version = "0.9.1"
 dependencies = [
  "chrono",
- "gpui-base",
+ "gpui-base 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gpui-component",
  "gpui-fast",
  "gpui-fast-platform",
@@ -4362,12 +4417,12 @@ dependencies = [
 [[package]]
 name = "gpui-kit-assets"
 version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb5abe0bbd8f9226170c8726e529f6574519e297e9ed1bde86d5fd4d3536079a"
 dependencies = [
  "anyhow",
  "gpui-fast",
- "gpui-fast-platform",
  "gpui-pre",
- "gpui-pre-platform",
  "gpui-pre-reqwest",
  "log",
  "rust-embed",
@@ -4941,7 +4996,7 @@ dependencies = [
  "chrono",
  "flate2",
  "fs2",
- "gpui-base",
+ "gpui-base 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gpui-component",
  "gpui-fast",
  "gpui-fast-platform",

@@ -126,9 +126,9 @@ anyhow.workspace = true
 gpui = { workspace = true }
 gpui-fast = { workspace = true, optional = true }
 gpui_macros.workspace = true
-gpui-base = "=0.9.0"
-gpui-component-macros = "=0.9.0"
-gpui-kit-assets = "=0.9.0"
+gpui-base = "=0.9.1"
+gpui-component-macros = "=0.9.1"
+gpui-kit-assets = "=0.9.1"
 notify.workspace = true
 ropey.workspace = true
 rust-i18n.workspace = true
